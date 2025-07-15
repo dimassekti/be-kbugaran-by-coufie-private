@@ -1,0 +1,145 @@
+const { Pool } = require("pg");
+const { nanoid } = require("nanoid");
+const InvariantError = require("../../exceptions/InvariantError");
+const NotFoundError = require("../../exceptions/NotFoundError");
+
+class EventParticipantsService {
+  constructor() {
+    this._pool = new Pool();
+  }
+
+  async addParticipant({ eventId, userId, role = "participant" }) {
+    // Check if user is already registered for this event
+    const existingQuery = {
+      text: "SELECT id FROM event_participants WHERE event_id = $1 AND user_id = $2",
+      values: [eventId, userId],
+    };
+
+    const existingResult = await this._pool.query(existingQuery);
+    if (existingResult.rows.length) {
+      throw new InvariantError("User sudah terdaftar untuk event ini");
+    }
+
+    // Generate participant code
+    const participantCode = await this._generateParticipantCode(eventId, role);
+
+    const id = `participant-${nanoid(16)}`;
+    const query = {
+      text: "INSERT INTO event_participants VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id",
+      values: [
+        id,
+        eventId,
+        userId,
+        participantCode,
+        role,
+        new Date(), // registration_date
+        "registered", // status
+        null, // notes
+        new Date(), // created_at
+        new Date(), // updated_at
+      ],
+    };
+
+    const result = await this._pool.query(query);
+    if (!result.rows[0].id) {
+      throw new InvariantError("Gagal mendaftarkan participant");
+    }
+    return { id: result.rows[0].id, participantCode };
+  }
+
+  async getEventParticipants(eventId) {
+    const query = {
+      text: `SELECT 
+               ep.id, ep.participant_code, ep.role, ep.registration_date, ep.status, ep.notes,
+               u.username, u.fullname
+             FROM event_participants ep
+             JOIN users u ON u.id = ep.user_id
+             WHERE ep.event_id = $1
+             ORDER BY ep.registration_date ASC`,
+      values: [eventId],
+    };
+    const result = await this._pool.query(query);
+    return result.rows;
+  }
+
+  async getParticipantByUserAndEvent(eventId, userId) {
+    const query = {
+      text: `SELECT 
+               ep.id, ep.participant_code, ep.role, ep.registration_date, ep.status, ep.notes,
+               u.username, u.fullname,
+               e.name as event_name, e.date as event_date
+             FROM event_participants ep
+             JOIN users u ON u.id = ep.user_id
+             JOIN events e ON e.id = ep.event_id
+             WHERE ep.event_id = $1 AND ep.user_id = $2`,
+      values: [eventId, userId],
+    };
+    const result = await this._pool.query(query);
+    if (!result.rows.length) {
+      throw new NotFoundError("Participant tidak ditemukan");
+    }
+    return result.rows[0];
+  }
+
+  async updateParticipantStatus(eventId, userId, status, notes = null) {
+    const query = {
+      text: "UPDATE event_participants SET status = $1, notes = $2, updated_at = $3 WHERE event_id = $4 AND user_id = $5 RETURNING id",
+      values: [status, notes, new Date(), eventId, userId],
+    };
+    const result = await this._pool.query(query);
+    if (!result.rows.length) {
+      throw new NotFoundError("Participant tidak ditemukan");
+    }
+  }
+
+  async removeParticipant(eventId, userId) {
+    const query = {
+      text: "DELETE FROM event_participants WHERE event_id = $1 AND user_id = $2 RETURNING id",
+      values: [eventId, userId],
+    };
+    const result = await this._pool.query(query);
+    if (!result.rows.length) {
+      throw new NotFoundError("Participant tidak ditemukan");
+    }
+  }
+
+  async _generateParticipantCode(eventId, role) {
+    const prefixes = {
+      participant: "P",
+      organizer: "O",
+      instructor: "I",
+      medical_staff: "M",
+      volunteer: "V",
+    };
+
+    const prefix = prefixes[role] || "P";
+
+    // Get the next sequence number for this role in this event
+    const sequenceQuery = {
+      text: "SELECT COUNT(*) as count FROM event_participants WHERE event_id = $1 AND role = $2",
+      values: [eventId, role],
+    };
+
+    const sequenceResult = await this._pool.query(sequenceQuery);
+    const nextSequence = parseInt(sequenceResult.rows[0].count) + 1;
+
+    return `${prefix}${nextSequence.toString().padStart(3, "0")}`;
+  }
+
+  async getUserEvents(userId) {
+    const query = {
+      text: `SELECT 
+               e.id, e.name, e.date, e.description,
+               ep.participant_code, ep.role, ep.status, ep.registration_date
+             FROM event_participants ep
+             JOIN events e ON e.id = ep.event_id
+             WHERE ep.user_id = $1
+             ORDER BY e.date DESC`,
+      values: [userId],
+    };
+    const result = await this._pool.query(query);
+    return result.rows;
+  }
+}
+
+module.exports = EventParticipantsService;
