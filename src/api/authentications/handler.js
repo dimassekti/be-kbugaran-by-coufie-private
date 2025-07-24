@@ -22,8 +22,17 @@ class AuthenticationsHandler {
       password
     );
 
-    const accessToken = this._tokenManager.generateAccessToken({ id });
-    const refreshToken = this._tokenManager.generateRefreshToken({ id });
+    // Get user with role information for token generation
+    const user = await this._usersService.getUserByIdWithRole(id);
+    const tokenPayload = {
+      id: user.id,
+      role: user.role,
+      username: user.username,
+      fullname: user.fullname,
+    };
+
+    const accessToken = this._tokenManager.generateAccessToken(tokenPayload);
+    const refreshToken = this._tokenManager.generateRefreshToken(tokenPayload);
 
     await this._authenticationsService.addRefreshToken(refreshToken);
 
@@ -44,9 +53,9 @@ class AuthenticationsHandler {
 
     const { refreshToken } = request.payload;
     await this._authenticationsService.verifyRefreshToken(refreshToken);
-    const { id } = this._tokenManager.verifyRefreshToken(refreshToken);
+    const payload = this._tokenManager.verifyRefreshToken(refreshToken);
 
-    const accessToken = this._tokenManager.generateAccessToken({ id });
+    const accessToken = this._tokenManager.generateAccessToken(payload);
     return {
       status: "success",
       message: "Access Token berhasil diperbarui",

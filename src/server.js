@@ -118,12 +118,18 @@ const init = async () => {
       sub: false,
       maxAgeSec: process.env.ACCESS_TOKEN_AGE,
     },
-    validate: (artifacts) => ({
-      isValid: true,
-      credentials: {
-        id: artifacts.decoded.payload.id,
-      },
-    }),
+    validate: (artifacts) => {
+      console.log("JWT artifacts:", artifacts);
+      console.log("JWT payload:", artifacts.decoded.payload);
+      const { payload } = artifacts.decoded;
+      return {
+        isValid: true,
+        credentials: {
+          id: payload.id,
+          role: payload.role || "member", // Default to member for backward compatibility
+        },
+      };
+    },
   });
 
   await server.register([

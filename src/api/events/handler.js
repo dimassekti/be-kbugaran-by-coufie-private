@@ -11,8 +11,17 @@ class EventsHandler {
 
   async postEventHandler(request, h) {
     this._validator.validateEventPayload(request.payload);
-    const { name, date, description } = request.payload;
-    const eventId = await this._service.addEvent({ name, date, description });
+    const { name, date, description, location, organizer, capacity, category } =
+      request.payload;
+    const eventId = await this._service.addEvent({
+      name,
+      date,
+      description,
+      location,
+      organizer,
+      capacity,
+      category,
+    });
     const response = h.response({
       status: "success",
       data: { eventId },
@@ -41,8 +50,17 @@ class EventsHandler {
   async putEventByIdHandler(request) {
     this._validator.validateEventPayload(request.payload);
     const { id } = request.params;
-    const { name, date, description } = request.payload;
-    await this._service.editEventById(id, { name, date, description });
+    const { name, date, description, location, organizer, capacity, category } =
+      request.payload;
+    await this._service.editEventById(id, {
+      name,
+      date,
+      description,
+      location,
+      organizer,
+      capacity,
+      category,
+    });
     return {
       status: "success",
       message: "Event berhasil diperbarui",

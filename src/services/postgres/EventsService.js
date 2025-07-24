@@ -2,17 +2,39 @@ const { Pool } = require("pg");
 const { nanoid } = require("nanoid");
 const InvariantError = require("../../exceptions/InvariantError");
 const NotFoundError = require("../../exceptions/NotFoundError");
+const {
+  notDeletedCondition,
+  softDeleteQuery,
+  buildSelectQuery,
+} = require("../../utils/softDelete");
 
 class EventsService {
   constructor() {
     this._pool = new Pool();
   }
 
-  async addEvent({ name, date, description }) {
+  async addEvent({
+    name,
+    date,
+    description,
+    location,
+    organizer,
+    capacity,
+    category,
+  }) {
     const id = `event-${nanoid(16)}`;
     const query = {
-      text: "INSERT INTO events VALUES($1, $2, $3, $4) RETURNING id",
-      values: [id, name, date, description || null],
+      text: "INSERT INTO events (id, name, date, description, location, organizer, capacity, category) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+      values: [
+        id,
+        name,
+        date,
+        description || null,
+        location || null,
+        organizer || null,
+        capacity || null,
+        category || null,
+      ],
     };
 
     const result = await this._pool.query(query);
@@ -24,7 +46,10 @@ class EventsService {
 
   async getEvents() {
     const query = {
-      text: "SELECT id, name, date, description FROM events ORDER BY date ASC",
+      text: `${buildSelectQuery(
+        "events",
+        "id, name, date, description, location, organizer, capacity, category"
+      )} ORDER BY date ASC`,
     };
     const result = await this._pool.query(query);
     return result.rows;
@@ -32,7 +57,7 @@ class EventsService {
 
   async getEventById(id) {
     const query = {
-      text: "SELECT id, name, date, description FROM events WHERE id = $1",
+      text: `SELECT id, name, date, description, location, organizer, capacity, category FROM events WHERE id = $1 AND ${notDeletedCondition()}`,
       values: [id],
     };
     const result = await this._pool.query(query);
@@ -42,10 +67,22 @@ class EventsService {
     return result.rows[0];
   }
 
-  async editEventById(id, { name, date, description }) {
+  async editEventById(
+    id,
+    { name, date, description, location, organizer, capacity, category }
+  ) {
     const query = {
-      text: "UPDATE events SET name = $1, date = $2, description = $3 WHERE id = $4 RETURNING id",
-      values: [name, date, description, id],
+      text: `UPDATE events SET name = $1, date = $2, description = $3, location = $4, organizer = $5, capacity = $6, category = $7 WHERE id = $8 AND ${notDeletedCondition()} RETURNING id`,
+      values: [
+        name,
+        date,
+        description,
+        location || null,
+        organizer || null,
+        capacity || null,
+        category || null,
+        id,
+      ],
     };
     const result = await this._pool.query(query);
     if (!result.rows.length) {
@@ -55,11 +92,11 @@ class EventsService {
 
   async deleteEventById(id) {
     const query = {
-      text: "DELETE FROM events WHERE id = $1 RETURNING id",
+      text: softDeleteQuery("events"),
       values: [id],
     };
     const result = await this._pool.query(query);
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError("Event tidak ditemukan");
     }
   }

@@ -13,6 +13,7 @@ class EventParticipantsHandler {
     this.deleteEventParticipantHandler =
       this.deleteEventParticipantHandler.bind(this);
     this.getUserEventsHandler = this.getUserEventsHandler.bind(this);
+    this.joinEventHandler = this.joinEventHandler.bind(this);
   }
 
   async postEventParticipantHandler(request, h) {
@@ -85,6 +86,24 @@ class EventParticipantsHandler {
       status: "success",
       data: { events },
     };
+  }
+
+  async joinEventHandler(request, h) {
+    const { eventId } = request.params;
+    const { id: userId } = request.auth.credentials;
+
+    const result = await this._service.joinEvent(eventId, userId);
+
+    const response = h.response({
+      status: "success",
+      message: "Berhasil bergabung dengan event",
+      data: {
+        participantId: result.id,
+        participantCode: result.participantCode,
+      },
+    });
+    response.code(201);
+    return response;
   }
 }
 

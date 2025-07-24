@@ -7,6 +7,10 @@ class UsersHandler {
 
     this.postUserHandler = this.postUserHandler.bind(this);
     this.getUserByIdHandler = this.getUserByIdHandler.bind(this);
+    this.getCurrentUserHandler = this.getCurrentUserHandler.bind(this);
+    this.getAllUsersHandler = this.getAllUsersHandler.bind(this);
+    this.deleteUserHandler = this.deleteUserHandler.bind(this);
+    this.updateUserRoleHandler = this.updateUserRoleHandler.bind(this);
   }
 
   async postUserHandler(request, h) {
@@ -40,6 +44,59 @@ class UsersHandler {
       data: {
         user,
       },
+    };
+  }
+
+  async getCurrentUserHandler(request, h) {
+    const { id } = request.auth.credentials;
+
+    // Debug logging
+    console.log("JWT credentials:", request.auth.credentials);
+    console.log("Extracted user ID:", id);
+
+    const user = await this._service.getUserById(id);
+
+    return {
+      status: "success",
+      data: {
+        user,
+      },
+    };
+  }
+
+  async getAllUsersHandler(request, h) {
+    const users = await this._service.getAllUsers();
+
+    return {
+      status: "success",
+      data: {
+        users,
+      },
+    };
+  }
+
+  async deleteUserHandler(request, h) {
+    const { id } = request.params;
+
+    await this._service.deleteUserById(id);
+
+    return {
+      status: "success",
+      message: "User berhasil dihapus",
+    };
+  }
+
+  async updateUserRoleHandler(request, h) {
+    this._validator.validateUserRoleUpdatePayload(request.payload);
+
+    const { id } = request.params;
+    const { role } = request.payload;
+
+    await this._service.updateUserRole(id, role);
+
+    return {
+      status: "success",
+      message: "Role user berhasil diperbarui",
     };
   }
 }

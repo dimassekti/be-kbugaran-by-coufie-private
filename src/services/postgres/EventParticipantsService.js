@@ -2,6 +2,10 @@ const { Pool } = require("pg");
 const { nanoid } = require("nanoid");
 const InvariantError = require("../../exceptions/InvariantError");
 const NotFoundError = require("../../exceptions/NotFoundError");
+const {
+  notDeletedCondition,
+  softDeleteQuery,
+} = require("../../utils/softDelete");
 
 class EventParticipantsService {
   constructor() {
@@ -11,7 +15,7 @@ class EventParticipantsService {
   async addParticipant({ eventId, userId, role = "participant" }) {
     // Check if user is already registered for this event
     const existingQuery = {
-      text: "SELECT id FROM event_participants WHERE event_id = $1 AND user_id = $2",
+      text: `SELECT id FROM event_participants WHERE event_id = $1 AND user_id = $2 AND ${notDeletedCondition()}`,
       values: [eventId, userId],
     };
 
@@ -47,6 +51,14 @@ class EventParticipantsService {
     return { id: result.rows[0].id, participantCode };
   }
 
+  async joinEvent(eventId, userId) {
+    return this.addParticipant({
+      eventId,
+      userId,
+      role: "participant",
+    });
+  }
+
   async getEventParticipants(eventId) {
     const query = {
       text: `SELECT 
@@ -54,7 +66,7 @@ class EventParticipantsService {
                u.username, u.fullname
              FROM event_participants ep
              JOIN users u ON u.id = ep.user_id
-             WHERE ep.event_id = $1
+             WHERE ep.event_id = $1 AND ep.${notDeletedCondition()} AND u.${notDeletedCondition()}
              ORDER BY ep.registration_date ASC`,
       values: [eventId],
     };
@@ -71,7 +83,7 @@ class EventParticipantsService {
              FROM event_participants ep
              JOIN users u ON u.id = ep.user_id
              JOIN events e ON e.id = ep.event_id
-             WHERE ep.event_id = $1 AND ep.user_id = $2`,
+             WHERE ep.event_id = $1 AND ep.user_id = $2 AND ep.${notDeletedCondition()} AND u.${notDeletedCondition()} AND e.${notDeletedCondition()}`,
       values: [eventId, userId],
     };
     const result = await this._pool.query(query);
@@ -83,7 +95,7 @@ class EventParticipantsService {
 
   async updateParticipantStatus(eventId, userId, status, notes = null) {
     const query = {
-      text: "UPDATE event_participants SET status = $1, notes = $2, updated_at = $3 WHERE event_id = $4 AND user_id = $5 RETURNING id",
+      text: `UPDATE event_participants SET status = $1, notes = $2, updated_at = $3 WHERE event_id = $4 AND user_id = $5 AND ${notDeletedCondition()} RETURNING id`,
       values: [status, notes, new Date(), eventId, userId],
     };
     const result = await this._pool.query(query);
@@ -94,11 +106,11 @@ class EventParticipantsService {
 
   async removeParticipant(eventId, userId) {
     const query = {
-      text: "DELETE FROM event_participants WHERE event_id = $1 AND user_id = $2 RETURNING id",
+      text: `UPDATE event_participants SET deleted_at = NOW() WHERE event_id = $1 AND user_id = $2 AND ${notDeletedCondition()}`,
       values: [eventId, userId],
     };
     const result = await this._pool.query(query);
-    if (!result.rows.length) {
+    if (!result.rowCount) {
       throw new NotFoundError("Participant tidak ditemukan");
     }
   }
@@ -116,12 +128,12 @@ class EventParticipantsService {
 
     // Get the next sequence number for this role in this event
     const sequenceQuery = {
-      text: "SELECT COUNT(*) as count FROM event_participants WHERE event_id = $1 AND role = $2",
+      text: `SELECT COUNT(*) as count FROM event_participants WHERE event_id = $1 AND role = $2 AND ${notDeletedCondition()}`,
       values: [eventId, role],
     };
 
     const sequenceResult = await this._pool.query(sequenceQuery);
-    const nextSequence = parseInt(sequenceResult.rows[0].count) + 1;
+    const nextSequence = parseInt(sequenceResult.rows[0].count, 10) + 1;
 
     return `${prefix}${nextSequence.toString().padStart(3, "0")}`;
   }
@@ -133,7 +145,7 @@ class EventParticipantsService {
                ep.participant_code, ep.role, ep.status, ep.registration_date
              FROM event_participants ep
              JOIN events e ON e.id = ep.event_id
-             WHERE ep.user_id = $1
+             WHERE ep.user_id = $1 AND ep.${notDeletedCondition()} AND e.${notDeletedCondition()}
              ORDER BY e.date DESC`,
       values: [userId],
     };
