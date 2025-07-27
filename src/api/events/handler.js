@@ -38,6 +38,7 @@ class EventsHandler {
     };
   }
 
+  // FETCH TEKNIK-MU1 data { event }
   async getEventByIdHandler(request) {
     const { id } = request.params;
     const event = await this._service.getEventById(id);
