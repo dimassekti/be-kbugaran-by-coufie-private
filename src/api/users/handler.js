@@ -11,6 +11,7 @@ class UsersHandler {
     this.getAllUsersHandler = this.getAllUsersHandler.bind(this);
     this.deleteUserHandler = this.deleteUserHandler.bind(this);
     this.updateUserRoleHandler = this.updateUserRoleHandler.bind(this);
+    this.getUserByUsernameHandler = this.getUserByUsernameHandler.bind(this);
   }
 
   async postUserHandler(request, h) {
@@ -97,6 +98,23 @@ class UsersHandler {
     return {
       status: "success",
       message: "Role user berhasil diperbarui",
+    };
+  }
+
+  async getUserByUsernameHandler(request) {
+    const { username } = request.params;
+
+    if (!username || !username.trim()) {
+      throw new ClientError("Username is required");
+    }
+
+    const user = await this._service.getUserByUsername(username.trim());
+
+    return {
+      status: "success",
+      data: {
+        user,
+      },
     };
   }
 }

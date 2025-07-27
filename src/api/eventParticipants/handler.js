@@ -8,6 +8,7 @@ class EventParticipantsHandler {
       this.getEventParticipantsHandler.bind(this);
     this.getParticipantByUserHandler =
       this.getParticipantByUserHandler.bind(this);
+    this.getParticipantByIdHandler = this.getParticipantByIdHandler.bind(this);
     this.putParticipantStatusHandler =
       this.putParticipantStatusHandler.bind(this);
     this.deleteEventParticipantHandler =
@@ -52,6 +53,15 @@ class EventParticipantsHandler {
       eventId,
       userId
     );
+    return {
+      status: "success",
+      data: { participant },
+    };
+  }
+
+  async getParticipantByIdHandler(request) {
+    const { participantId } = request.params;
+    const participant = await this._service.getParticipantById(participantId);
     return {
       status: "success",
       data: { participant },

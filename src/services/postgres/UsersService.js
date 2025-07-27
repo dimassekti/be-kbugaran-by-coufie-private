@@ -135,6 +135,21 @@ class UsersService {
     }
     return id;
   }
+
+  async getUserByUsername(username) {
+    const query = {
+      text: `SELECT id, username, fullname, role FROM users WHERE username = $1 AND ${notDeletedCondition()}`,
+      values: [username],
+    };
+
+    const result = await this._pool.query(query);
+
+    if (!result.rows.length) {
+      throw new NotFoundError("User tidak ditemukan");
+    }
+
+    return result.rows[0];
+  }
 }
 
 module.exports = UsersService;

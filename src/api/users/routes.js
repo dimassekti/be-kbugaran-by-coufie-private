@@ -29,6 +29,14 @@ const routes = (handler) => [
     },
   },
   {
+    method: "GET",
+    path: "/users/username/{username}",
+    handler: handler.getUserByUsernameHandler,
+    options: {
+      auth: "app_jwt",
+    },
+  },
+  {
     method: "DELETE",
     path: "/users/{id}",
     handler: handler.deleteUserHandler,

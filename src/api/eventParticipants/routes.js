@@ -15,6 +15,14 @@ const routes = (handler) => [
     handler: handler.getParticipantByUserHandler,
   },
   {
+    method: "GET",
+    path: "/participants/{participantId}",
+    handler: handler.getParticipantByIdHandler,
+    options: {
+      auth: "app_jwt",
+    },
+  },
+  {
     method: "PUT",
     path: "/events/{eventId}/participants/{userId}",
     handler: handler.putParticipantStatusHandler,

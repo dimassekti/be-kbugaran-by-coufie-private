@@ -152,6 +152,28 @@ class EventParticipantsService {
     const result = await this._pool.query(query);
     return result.rows;
   }
+
+  async getParticipantById(participantId) {
+    const query = {
+      text: `SELECT 
+               ep.id, ep.participant_code, ep.role, ep.status, ep.registration_date, ep.notes,
+               ep.event_id, ep.user_id,
+               u.username, u.fullname, u.role as user_role,
+               e.name as event_name, e.date as event_date, e.description as event_description
+             FROM event_participants ep
+             JOIN users u ON u.id = ep.user_id
+             JOIN events e ON e.id = ep.event_id
+             WHERE ep.id = $1 AND ep.${notDeletedCondition()} AND u.${notDeletedCondition()} AND e.${notDeletedCondition()}`,
+      values: [participantId],
+    };
+    const result = await this._pool.query(query);
+
+    if (!result.rows.length) {
+      throw new NotFoundError("Participant tidak ditemukan");
+    }
+
+    return result.rows[0];
+  }
 }
 
 module.exports = EventParticipantsService;
