@@ -22,8 +22,10 @@ class UsersHandler {
     // Check if role parameter is provided and user is authenticated as admin
     let userRole = "member"; // default role
     if (role && request.auth && request.auth.credentials) {
-      const { user } = request.auth.credentials;
-      if (user.role === "admin") {
+      // Safely extract the authenticated user's role
+      const { role: authUserRole } = request.auth.credentials || {};
+
+      if (authUserRole === "admin") {
         // Prevent creation of admin users
         if (role === "admin") {
           throw new InvariantError("Cannot create admin users");
@@ -91,14 +93,11 @@ class UsersHandler {
     };
   }
 
-  async deleteUserHandler(request, h) {
-    const { id } = request.params;
-
-    await this._service.deleteUserById(id);
-
+  async deleteUserHandler() {
+    // Return disabled response instead of actually deleting the user
     return {
-      status: "success",
-      message: "User berhasil dihapus",
+      status: "disabled",
+      message: "User deletion is currently disabled for safety reasons",
     };
   }
 

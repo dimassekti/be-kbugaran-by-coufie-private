@@ -3,7 +3,7 @@ const { nanoid } = require("nanoid");
 const InvariantError = require("../../exceptions/InvariantError");
 const NotFoundError = require("../../exceptions/NotFoundError");
 const {
-  softDeleteCondition,
+  notDeletedCondition,
   applySoftDelete,
 } = require("../../utils/softDelete");
 
@@ -21,7 +21,7 @@ class EventMedicalStaffService {
     // Check if staff is already assigned to this event
     const checkQuery = {
       text: `SELECT id FROM event_medical_staff 
-             WHERE event_id = $1 AND hospital_staff_id = $2 AND ${softDeleteCondition()}`,
+             WHERE event_id = $1 AND hospital_staff_id = $2 AND ${notDeletedCondition()}`,
       values: [eventId, hospitalStaffId],
     };
 
@@ -59,8 +59,8 @@ class EventMedicalStaffService {
              JOIN hospital_medical_staff hms ON ems.hospital_staff_id = hms.id
              JOIN users u ON hms.user_id = u.id
              JOIN hospitals h ON hms.hospital_id = h.id
-             WHERE ems.event_id = $1 AND ems.${softDeleteCondition()} 
-                   AND hms.${softDeleteCondition()} AND u.${softDeleteCondition()} AND h.${softDeleteCondition()}
+             WHERE ems.event_id = $1 AND ems.${notDeletedCondition()} 
+                   AND hms.${notDeletedCondition()} AND u.${notDeletedCondition()} AND h.${notDeletedCondition()}
              ORDER BY ems.assigned_date DESC`,
       values: [eventId],
     };
@@ -79,11 +79,11 @@ class EventMedicalStaffService {
              JOIN users u ON hms.user_id = u.id
              JOIN hospitals h ON hms.hospital_id = h.id
              WHERE hms.is_active = true 
-                   AND hms.${softDeleteCondition()} AND u.${softDeleteCondition()} AND h.${softDeleteCondition()}
+                   AND hms.${notDeletedCondition()} AND u.${notDeletedCondition()} AND h.${notDeletedCondition()}
                    AND hms.id NOT IN (
                      SELECT hospital_staff_id 
                      FROM event_medical_staff 
-                     WHERE event_id = $1 AND ${softDeleteCondition()}
+                     WHERE event_id = $1 AND ${notDeletedCondition()}
                    )
              ORDER BY h.name, hms.staff_role, u.fullname`,
       values: [eventId],
@@ -108,8 +108,8 @@ class EventMedicalStaffService {
              JOIN hospital_medical_staff hms ON ems.hospital_staff_id = hms.id
              JOIN users u ON hms.user_id = u.id
              JOIN hospitals h ON hms.hospital_id = h.id
-             WHERE ems.id = $1 AND ems.${softDeleteCondition()} 
-                   AND hms.${softDeleteCondition()} AND u.${softDeleteCondition()} AND h.${softDeleteCondition()}`,
+             WHERE ems.id = $1 AND ems.${notDeletedCondition()} 
+                   AND hms.${notDeletedCondition()} AND u.${notDeletedCondition()} AND h.${notDeletedCondition()}`,
       values: [eventStaffId],
     };
 

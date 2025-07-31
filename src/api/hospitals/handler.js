@@ -78,8 +78,12 @@ class HospitalsHandler {
 
   async postHospitalStaffHandler(request, h) {
     const { id } = request.params;
+
+    // Validate the request payload first (without hospitalId)
+    this._validator.validateHospitalStaffPayload(request.payload);
+
+    // Then add hospitalId for the service call
     const payload = { ...request.payload, hospitalId: id };
-    this._validator.validateHospitalStaffPayload(payload);
 
     const staffId = await this._hospitalMedicalStaffService.addStaffToHospital(
       payload

@@ -3,7 +3,7 @@ const { nanoid } = require("nanoid");
 const InvariantError = require("../../exceptions/InvariantError");
 const NotFoundError = require("../../exceptions/NotFoundError");
 const {
-  softDeleteCondition,
+  notDeletedCondition,
   applySoftDelete,
 } = require("../../utils/softDelete");
 
@@ -23,7 +23,7 @@ class HospitalMedicalStaffService {
     // Check if user is already assigned to this hospital
     const checkQuery = {
       text: `SELECT id FROM hospital_medical_staff 
-             WHERE hospital_id = $1 AND user_id = $2 AND ${softDeleteCondition()}`,
+             WHERE hospital_id = $1 AND user_id = $2 AND ${notDeletedCondition()}`,
       values: [hospitalId, userId],
     };
 
@@ -68,7 +68,7 @@ class HospitalMedicalStaffService {
                     u.username, u.fullname
              FROM hospital_medical_staff hms
              JOIN users u ON hms.user_id = u.id
-             WHERE hms.hospital_id = $1 AND hms.${softDeleteCondition()} AND u.${softDeleteCondition()}
+             WHERE hms.hospital_id = $1 AND hms.${notDeletedCondition()} AND u.${notDeletedCondition()}
              ORDER BY hms.assigned_date DESC`,
       values: [hospitalId],
     };
@@ -85,7 +85,7 @@ class HospitalMedicalStaffService {
                     u.username, u.fullname
              FROM hospital_medical_staff hms
              JOIN users u ON hms.user_id = u.id
-             WHERE hms.hospital_id = $1 AND hms.user_id = $2 AND hms.${softDeleteCondition()} AND u.${softDeleteCondition()}`,
+             WHERE hms.hospital_id = $1 AND hms.user_id = $2 AND hms.${notDeletedCondition()} AND u.${notDeletedCondition()}`,
       values: [hospitalId, userId],
     };
 
@@ -107,7 +107,7 @@ class HospitalMedicalStaffService {
              FROM hospital_medical_staff hms
              JOIN users u ON hms.user_id = u.id
              JOIN hospitals h ON hms.hospital_id = h.id
-             WHERE hms.id = $1 AND hms.${softDeleteCondition()} AND u.${softDeleteCondition()} AND h.${softDeleteCondition()}`,
+             WHERE hms.id = $1 AND hms.${notDeletedCondition()} AND u.${notDeletedCondition()} AND h.${notDeletedCondition()}`,
       values: [staffId],
     };
 
