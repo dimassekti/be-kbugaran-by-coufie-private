@@ -6,7 +6,7 @@ const Jwt = require("@hapi/jwt");
 const Inert = require("@hapi/inert");
 const path = require("path");
 
-const ClientError = require("./exceptions/ClientError");
+const { categorizeError, logError } = require("./utils/errorHandler");
 
 // albums
 const albums = require("./api/albums");
@@ -71,6 +71,18 @@ const checkupReviewers = require("./api/checkupReviewers");
 const CheckupReviewersService = require("./services/postgres/CheckupReviewersService");
 const CheckupReviewersValidator = require("./validator/checkupReviewers");
 
+// hospitals
+const hospitals = require("./api/hospitals");
+const HospitalsService = require("./services/postgres/HospitalsService");
+const HospitalMedicalStaffService = require("./services/postgres/HospitalMedicalStaffService");
+const HospitalsValidator = require("./validator/hospitals");
+const HospitalMedicalStaffValidator = require("./validator/hospitalMedicalStaff");
+
+// event medical staff
+const eventMedicalStaff = require("./api/eventMedicalStaff");
+const EventMedicalStaffService = require("./services/postgres/EventMedicalStaffService");
+const EventMedicalStaffValidator = require("./validator/eventMedicalStaff");
+
 const init = async () => {
   const cacheService = new CacheService();
   const albumsService = new AlbumsService();
@@ -88,6 +100,9 @@ const init = async () => {
   const participantCheckupsService = new ParticipantCheckupsService();
   const checkupResultsService = new CheckupResultsService();
   const checkupReviewersService = new CheckupReviewersService();
+  const hospitalsService = new HospitalsService();
+  const hospitalMedicalStaffService = new HospitalMedicalStaffService();
+  const eventMedicalStaffService = new EventMedicalStaffService();
 
   const server = Hapi.server({
     port: process.env.PORT,
@@ -237,17 +252,40 @@ const init = async () => {
         validator: CheckupReviewersValidator,
       },
     },
+    {
+      plugin: hospitals,
+      options: {
+        hospitalsService,
+        hospitalMedicalStaffService,
+        validator: {
+          validateHospitalPayload: HospitalsValidator.validateHospitalPayload,
+          validateHospitalStaffPayload:
+            HospitalMedicalStaffValidator.validateHospitalStaffPayload,
+        },
+      },
+    },
+    {
+      plugin: eventMedicalStaff,
+      options: {
+        eventMedicalStaffService,
+        validator: EventMedicalStaffValidator,
+      },
+    },
   ]);
 
   server.ext("onPreResponse", (request, h) => {
     const { response } = request;
 
-    if (response instanceof ClientError) {
-      const newResponse = h.response({
-        status: "fail",
-        message: response.message,
-      });
-      newResponse.code(response.statusCode);
+    // Handle all types of errors using the error handler utility
+    if (response instanceof Error) {
+      // Log error for debugging
+      logError(response, request);
+
+      // Categorize and format error response
+      const { statusCode, response: errorResponse } = categorizeError(response);
+
+      const newResponse = h.response(errorResponse);
+      newResponse.code(statusCode);
       return newResponse;
     }
 

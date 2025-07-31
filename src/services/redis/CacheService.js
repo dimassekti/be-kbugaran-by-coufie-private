@@ -1,4 +1,6 @@
 const redis = require("redis");
+const InvariantError = require("../../exceptions/InvariantError");
+const NotFoundError = require("../../exceptions/NotFoundError");
 
 class CacheService {
   constructor() {
@@ -21,22 +23,35 @@ class CacheService {
   }
 
   async set(key, value, expirationInSecond = 1800) {
-    if (!this._enabled) throw new Error("Redis is disabled.");
-    await this._client.set(key, value, {
-      EX: expirationInSecond,
-    });
+    if (!this._enabled) throw new InvariantError("Redis tidak tersedia");
+    try {
+      await this._client.set(key, value, {
+        EX: expirationInSecond,
+      });
+    } catch (error) {
+      throw new InvariantError("Gagal menyimpan cache");
+    }
   }
 
   async get(key) {
-    if (!this._enabled) throw new Error("Redis is disabled.");
-    const result = await this._client.get(key);
-    if (result === null) throw new Error("Cache tidak ditemukan");
-    return result;
+    if (!this._enabled) throw new InvariantError("Redis tidak tersedia");
+    try {
+      const result = await this._client.get(key);
+      if (result === null) throw new NotFoundError("Cache tidak ditemukan");
+      return result;
+    } catch (error) {
+      if (error instanceof NotFoundError) throw error;
+      throw new InvariantError("Gagal mengambil cache");
+    }
   }
 
   delete(key) {
-    if (!this._enabled) throw new Error("Redis is disabled.");
-    return this._client.del(key);
+    if (!this._enabled) throw new InvariantError("Redis tidak tersedia");
+    try {
+      return this._client.del(key);
+    } catch (error) {
+      throw new InvariantError("Gagal menghapus cache");
+    }
   }
 }
 

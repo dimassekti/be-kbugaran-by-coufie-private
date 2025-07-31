@@ -1,10 +1,33 @@
 const { requireAdminRole } = require("../../helpers/authorization");
+const AuthorizationError = require("../../exceptions/AuthorizationError");
 
 const routes = (handler) => [
   {
     method: "POST",
     path: "/users",
     handler: handler.postUserHandler,
+    options: {
+      auth: {
+        mode: "try",
+        strategy: "app_jwt",
+      },
+      pre: [
+        {
+          method: (request, h) => {
+            // Require admin authentication only if role parameter is provided
+            if (request.payload && request.payload.role) {
+              if (!request.auth.isAuthenticated || !request.auth.credentials) {
+                throw new AuthorizationError(
+                  "Authentication required for role assignment"
+                );
+              }
+              return requireAdminRole().method(request, h);
+            }
+            return h.continue;
+          },
+        },
+      ],
+    },
   },
   {
     method: "GET",

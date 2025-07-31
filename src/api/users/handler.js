@@ -1,4 +1,5 @@
 const ClientError = require("../../exceptions/ClientError");
+const InvariantError = require("../../exceptions/InvariantError");
 
 class UsersHandler {
   constructor(service, validator) {
@@ -16,12 +17,26 @@ class UsersHandler {
 
   async postUserHandler(request, h) {
     this._validator.validateUserPayload(request.payload);
-    const { username, password, fullname } = request.payload;
+    const { username, password, fullname, role } = request.payload;
+
+    // Check if role parameter is provided and user is authenticated as admin
+    let userRole = "member"; // default role
+    if (role && request.auth && request.auth.credentials) {
+      const { user } = request.auth.credentials;
+      if (user.role === "admin") {
+        // Prevent creation of admin users
+        if (role === "admin") {
+          throw new InvariantError("Cannot create admin users");
+        }
+        userRole = role;
+      }
+    }
 
     const userId = await this._service.addUser({
       username,
       password,
       fullname,
+      role: userRole,
     });
 
     const response = h.response({
@@ -55,7 +70,7 @@ class UsersHandler {
     console.log("JWT credentials:", request.auth.credentials);
     console.log("Extracted user ID:", id);
 
-    const user = await this._service.getUserById(id);
+    const user = await this._service.getUserByIdWithRole(id);
 
     return {
       status: "success",
