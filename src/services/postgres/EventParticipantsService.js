@@ -24,31 +24,52 @@ class EventParticipantsService {
       throw new InvariantError("User sudah terdaftar untuk event ini");
     }
 
-    // Generate participant code
-    const participantCode = await this._generateParticipantCode(eventId, role);
+    // Generate participant code with retry logic
+    let participantCode;
+    let attempts = 0;
+    const maxAttempts = 5;
 
-    const id = `participant-${nanoid(16)}`;
-    const query = {
-      text: "INSERT INTO event_participants VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id",
-      values: [
-        id,
-        eventId,
-        userId,
-        participantCode,
-        role,
-        new Date(), // registration_date
-        "registered", // status
-        null, // notes
-        new Date(), // created_at
-        new Date(), // updated_at
-      ],
-    };
+    while (attempts < maxAttempts) {
+      try {
+        participantCode = await this._generateParticipantCode(eventId, role);
 
-    const result = await this._pool.query(query);
-    if (!result.rows[0].id) {
-      throw new InvariantError("Gagal mendaftarkan participant");
+        const id = `participant-${nanoid(16)}`;
+        const query = {
+          text: "INSERT INTO event_participants VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id",
+          values: [
+            id,
+            eventId,
+            userId,
+            participantCode,
+            role,
+            new Date(), // registration_date
+            "registered", // status
+            null, // notes
+            new Date(), // created_at
+            new Date(), // updated_at
+          ],
+        };
+
+        const result = await this._pool.query(query);
+        if (!result.rows[0].id) {
+          throw new InvariantError("Gagal mendaftarkan participant");
+        }
+        return { id: result.rows[0].id, participantCode };
+      } catch (error) {
+        if (error.constraint === "event_participants_code_event_unique") {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            throw new InvariantError(
+              "Gagal menghasilkan kode participant yang unik. Silakan coba lagi."
+            );
+          }
+          // Retry with a new participant code
+          continue;
+        }
+        // Re-throw other errors
+        throw error;
+      }
     }
-    return { id: result.rows[0].id, participantCode };
   }
 
   async joinEvent(eventId, userId) {
@@ -126,16 +147,26 @@ class EventParticipantsService {
 
     const prefix = prefixes[role] || "P";
 
-    // Get the next sequence number for this role in this event
-    const sequenceQuery = {
-      text: `SELECT COUNT(*) as count FROM event_participants WHERE event_id = $1 AND role = $2 AND ${notDeletedCondition()}`,
-      values: [eventId, role],
+    // Get the highest existing participant code for this event and role
+    const query = {
+      text: `SELECT participant_code FROM event_participants 
+             WHERE event_id = $1 AND participant_code LIKE $2 AND ${notDeletedCondition()}
+             ORDER BY participant_code DESC LIMIT 1`,
+      values: [eventId, `${prefix}%`],
     };
 
-    const sequenceResult = await this._pool.query(sequenceQuery);
-    const nextSequence = parseInt(sequenceResult.rows[0].count, 10) + 1;
+    const result = await this._pool.query(query);
 
-    return `${prefix}${nextSequence.toString().padStart(3, "0")}`;
+    let nextNumber = 1;
+    if (result.rows.length > 0) {
+      const lastCode = result.rows[0].participant_code;
+      // Extract number from code like "P001" -> 1
+      const lastNumber = parseInt(lastCode.substring(1), 10);
+      nextNumber = lastNumber + 1;
+    }
+
+    // Format with leading zeros (e.g., P001, P002, etc.)
+    return `${prefix}${nextNumber.toString().padStart(3, "0")}`;
   }
 
   async getUserEvents(userId) {
